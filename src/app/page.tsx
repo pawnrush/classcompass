@@ -97,7 +97,7 @@ const FrequencyTracker = ({ title, behaviorList, onLog, isTargetBehavior }) => {
     const [behavior, setBehavior] = useState(behaviorList[0] || '');
     const [frequency, setFrequency] = useState(0);
     const [intensity, setIntensity] = useState('Low');
-    const [sessionLogs, setSessionLogs] = useState([]);
+    const [sessionLogs, setSessionLogs] = useState<{time: string, freq: number}[]>([]);
     const [chartsReady, setChartsReady] = useState(false);
 
     useEffect(() => setChartsReady(!!(window as any).Recharts), []);
