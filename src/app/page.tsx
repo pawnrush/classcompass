@@ -25,7 +25,44 @@ const ROLES = { ADMIN: 'Admin', TEACHER: 'Teacher', PARAPROFESSIONAL: 'Paraprofe
 const mockUsers = [ { id: 1, name: 'Dr. Evelyn Reed', role: ROLES.ADMIN, studentIds: [1, 2] }, { id: 2, name: 'Mr. David Chen', role: ROLES.TEACHER, studentIds: [1] }, { id: 3, name: 'Ms. Maria Garcia', role: ROLES.PARAPROFESSIONAL, studentIds: [1, 2] }, { id: 4, name: 'Dr. Sam Jones', role: ROLES.SPECIALIST, studentIds: [1, 2] }, { id: 5, name: 'Sarah Carter', role: ROLES.PARENT, studentIds: [2] }, ];
 
 // --- CUSTOM HOOKS ---
-const useTimer = (initialState = 0) => { const [elapsedTime, setElapsedTime] = useState(initialState); const [isRunning, setIsRunning] = useState(false); const timerRef = useRef(null); useEffect(() => { if (isRunning) { const startTime = Date.now() - elapsedTime; timerRef.current = setInterval(() => { setElapsedTime(Date.now() - startTime); }, 100); } else { clearInterval(timerRef.current); } return () => clearInterval(timerRef.current); }, [isRunning, elapsedTime]); const formatTime = useCallback((time) => { const totalSeconds = Math.floor(time / 1000); const minutes = Math.floor(totalSeconds / 60); const seconds = totalSeconds % 60; return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`; }, []); const resetTimer = () => { setIsRunning(false); setElapsedTime(0); }; return { elapsedTime, isRunning, setIsRunning, formatTime, resetTimer }; };
+const useTimer = (initialState = 0) => {
+    const [elapsedTime, setElapsedTime] = useState(initialState);
+    const [isRunning, setIsRunning] = useState(false);
+    // Explicitly type the ref to hold a NodeJS.Timeout or null
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+    useEffect(() => {
+        if (isRunning) {
+            const startTime = Date.now() - elapsedTime;
+            timerRef.current = setInterval(() => {
+                setElapsedTime(Date.now() - startTime);
+            }, 100);
+        } else {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+        }
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+        };
+    }, [isRunning, elapsedTime]);
+    
+    const formatTime = useCallback((time: number) => {
+        const totalSeconds = Math.floor(time / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }, []);
+    
+    const resetTimer = () => {
+        setIsRunning(false);
+        setElapsedTime(0);
+    };
+    
+    return { elapsedTime, isRunning, setIsRunning, formatTime, resetTimer };
+};
 
 // --- MOCK DATA ---
 const students = [ { id: 1, name: 'Olivia Chen', grade: '5' }, { id: 2, name: 'Benjamin Carter', grade: '4' }, ];
@@ -34,7 +71,7 @@ const replacementBehaviorOptions = ["Request help", "Request break", "Use calmin
 const observationLogs = [ { studentId: 1, timestamp: "2025-06-12T13:15:00Z", frequency: 3, intensity: "High", antecedent: "Given instruction/demand", behavior: "Non-compliance", consequence: "Redirected" }, { studentId: 1, timestamp: "2025-06-12T15:30:00Z", frequency: 1, intensity: "Low", antecedent: "Transition/change in activity", behavior: "Disruptive Behaviors", consequence: "Adult attention provided" }, { studentId: 1, timestamp: "2025-06-13T16:00:00Z", frequency: 2, intensity: "Moderate", antecedent: "Given instruction/demand", behavior: "Non-compliance", consequence: "Task/activity avoided" }, { studentId: 1, timestamp: "2025-06-13T19:00:00Z", frequency: 1, intensity: "High", antecedent: "Denied access", behavior: "Elopement", consequence: "Redirected" }, { studentId: 1, timestamp: "2025-06-14T14:00:00Z", frequency: 4, intensity: "Moderate", antecedent: "Given instruction/demand", behavior: "Disruptive Behaviors", consequence: "Redirected" }, { studentId: 2, timestamp: "2025-06-12T14:45:00Z", frequency: 1, intensity: "Low", antecedent: "Transition/change in activity", behavior: "Non-compliance", consequence: "Adult attention provided" }, { studentId: 2, timestamp: "2025-06-13T18:20:00Z", frequency: 2, intensity: "High", antecedent: "Denied access", behavior: "Disruptive Behaviors", consequence: "Task/activity avoided" }, ];
 
 // --- DATA PROCESSING UTILITIES ---
-const processFrequencyData = (logs) => { const dailyData = logs.reduce((acc, log) => { const date = new Date(log.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); if (!acc[date]) { acc[date] = { date, frequency: 0 }; } acc[date].frequency += log.frequency; return acc; }, {}); return Object.values(dailyData).sort((a, b) => new Date(a.date) - new Date(b.date)); };
+const processFrequencyData = (logs) => { const dailyData = logs.reduce((acc, log) => { const date = new Date(log.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); if (!acc[date]) { acc[date] = { date, frequency: 0 }; } acc[date].frequency += log.frequency; return acc; }, {}); return Object.values(dailyData).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); };
 const processAbcData = (logs) => { const abcCounts = { antecedents: {}, behaviors: {}, consequences: {} }; logs.forEach(log => { if (log.antecedent) abcCounts.antecedents[log.antecedent] = (abcCounts.antecedents[log.antecedent] || 0) + 1; if (log.behavior) abcCounts.behaviors[log.behavior] = (abcCounts.behaviors[log.behavior] || 0) + 1; if (log.consequence) abcCounts.consequences[log.consequence] = (abcCounts.consequences[log.consequence] || 0) + 1; }); const formatForChart = (data) => Object.entries(data).map(([name, value]) => ({ name, count: value })); return { antecedents: formatForChart(abcCounts.antecedents), behaviors: formatForChart(abcCounts.behaviors), consequences: formatForChart(abcCounts.consequences), }; };
 const processHeatmapData = (logs) => { const intensityMap = { 'Low': 1, 'Moderate': 2, 'High': 3 }; return logs.map(log => { const date = new Date(log.timestamp); const time = date.getUTCHours() + date.getUTCMinutes() / 60; return { time, day: date.getDay(), intensity: intensityMap[log.intensity] }; }); };
 
@@ -46,7 +83,7 @@ const AbcBarChart = ({ data, dataKey, title }) => ( <ChartContainer title={title
 const BehaviorHeatmap = ({ data }) => { const intensityColors = { 1: '#93c5fd', 2: '#3b82f6', 3: '#be123c' }; const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; return ( <ChartContainer title="Behavior Intensity by Time of Day"><ResponsiveContainer width="100%" height="90%"><Recharts.ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}><Recharts.CartesianGrid /><Recharts.XAxis type="number" dataKey="time" name="Time" domain={[7.5, 16.75]} tickFormatter={(time) => `${Math.floor(time)}:${String(Math.round((time % 1) * 60)).padStart(2, '0')}`} /><Recharts.YAxis type="number" dataKey="day" name="Day" domain={[0, 6]} tickFormatter={(day) => weekDays[day]} /><Recharts.ZAxis dataKey="intensity" range={[100, 500]} /><Recharts.Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ active, payload }) => { if (active && payload && payload.length) { const data = payload[0].payload; const intensityLevels = { 1: 'Low', 2: 'Moderate', 3: 'High' }; const time = `${Math.floor(data.time)}:${String(Math.round((data.time % 1) * 60)).padStart(2, '0')}`; return <div className="bg-white p-2 border rounded shadow-lg"> <p>{`Time: ${time}`}</p> <p>{`Day: ${weekDays[data.day]}`}</p><p>{`Intensity: ${intensityLevels[data.intensity]}`}</p></div>; } return null; }} /><Recharts.Scatter name="Observations" data={data}>{data.map((entry, index) => { const cellColor = intensityColors[entry.intensity] || "#ccc"; return <Recharts.Cell key={`cell-${index}`} fill={cellColor} />; })}</Recharts.Scatter></Recharts.ScatterChart></ResponsiveContainer></ChartContainer> ); };
 
 // --- GEMINI API COMPONENTS ---
-function GeminiFbaHelper({ logs }) {
+function GeminiFbaHelper({ logs }) { /* ... unchanged ... */ 
     const [isLoading, setIsLoading] = useState(false); const [hypothesis, setHypothesis] = useState(''); const [interventions, setInterventions] = useState([]); const [error, setError] = useState('');
     const handleAnalyzeFunction = async () => { setIsLoading(true); setError(''); setHypothesis(''); setInterventions([]); const formattedLogs = logs.map(l => `On ${new Date(l.timestamp).toLocaleString()}, Antecedent: ${l.antecedent}, Behavior: ${l.behavior}, Consequence: ${l.consequence}.`).join('\n'); const prompt = `Based on the following Antecedent-Behavior-Consequence (ABC) data for a student, please generate a hypothesis for the primary function of the behavior. The possible functions are attention, escape, tangible, or sensory. Provide a brief rationale for your hypothesis.\n\nData:\n${formattedLogs}`; try { const chatHistory = [{ role: "user", parts: [{ text: prompt }] }]; const payload = { contents: chatHistory }; const apiKey = ""; const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`; const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); if (!response.ok) { throw new Error(`API call failed with status: ${response.status}`); } const result = await response.json(); if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) { setHypothesis(result.candidates[0].content.parts[0].text); } else { throw new Error("Invalid response format from API."); } } catch (err) { setError(err.message); console.error("Error analyzing function:", err); } finally { setIsLoading(false); } };
     const handleSuggestInterventions = async () => { setIsLoading(true); setError(''); setInterventions([]); const prompt = `Given the following behavior function hypothesis for a student, suggest 3 evidence-based intervention strategies. Hypothesis: ${hypothesis}`; const schema = { type: "ARRAY", items: { type: "OBJECT", properties: { name: { type: "STRING" }, description: { type: "STRING" } }, required: ["name", "description"] } }; try { const chatHistory = [{ role: "user", parts: [{ text: prompt }] }]; const payload = { contents: chatHistory, generationConfig: { responseMimeType: "application/json", responseSchema: schema }}; const apiKey = ""; const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`; const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); if (!response.ok) { throw new Error(`API call failed with status: ${response.status}`); } const result = await response.json(); if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) { const parsedInterventions = JSON.parse(result.candidates[0].content.parts[0].text); setInterventions(parsedInterventions); } else { throw new Error("Invalid response format from API."); } } catch (err) { setError(err.message); console.error("Error suggesting interventions:", err); } finally { setIsLoading(false); } };
