@@ -28,23 +28,23 @@ const mockUsers = [ { id: 1, name: 'Dr. Evelyn Reed', role: ROLES.ADMIN, student
 const useTimer = (initialState = 0) => {
     const [elapsedTime, setElapsedTime] = useState(initialState);
     const [isRunning, setIsRunning] = useState(false);
-    // Explicitly type the ref to hold a NodeJS.Timeout or null
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    // Explicitly type the ref to hold a number (for browser's setInterval ID) or null
+    const timerRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (isRunning) {
             const startTime = Date.now() - elapsedTime;
-            timerRef.current = setInterval(() => {
+            timerRef.current = window.setInterval(() => {
                 setElapsedTime(Date.now() - startTime);
             }, 100);
         } else {
             if (timerRef.current) {
-                clearInterval(timerRef.current);
+                window.clearInterval(timerRef.current);
             }
         }
         return () => {
             if (timerRef.current) {
-                clearInterval(timerRef.current);
+                window.clearInterval(timerRef.current);
             }
         };
     }, [isRunning, elapsedTime]);
